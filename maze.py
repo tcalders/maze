@@ -3,6 +3,8 @@
 from IPython.display import display
 from ipycanvas import Canvas
 import time
+from ipycanvas import MultiCanvas
+
 
 # --------------------------------
 # Configuration
@@ -67,46 +69,53 @@ def lees_doolhof(path):
 # --------------------------------
 def draw_doolhof_once():
     global env
-    if not graphics: return
-    cv = env.cv
+    cv = env.maze_layer
+    cv.clear()  # just in case
+    cv.fill_style = "black"
+    cv.fill_rect(0, 0, env.w, env.h)
+
     for j, row in enumerate(env.doolhof):
         for i, cell in enumerate(row):
-            if cell == MUUR: color='black'
-            elif cell == TOKEN: color='red'
-            elif cell == DOEL: color='green'
-            else: color='white'
-            cv.fill_style = color
-            cv.fill_rect(i*env.cw, j*env.ch, env.cw, env.ch)
+            if cell == MUUR:
+                color = "black"
+            elif cell == TOKEN:
+                color = "red"
+            elif cell == DOEL:
+                color = "green"
+            else:
+                color = "white"
+            if color!="black":
+              cv.fill_style = color
+              cv.fill_rect(i*env.cw, j*env.ch, env.cw, env.ch)
 
 def draw_player_smooth(old_pos=None):
+    """
+    Draw the player as a triangle on the player layer.
+    Only erases the previous position by covering it with the maze color.
+    """
     global env
-    if not graphics: return
-    cv = env.cv
-    if old_pos:
-        r,c = old_pos
-        cell = env.doolhof[r][c]
-        color = 'white' if cell==GANG else 'red' if cell==TOKEN else 'green' if cell==DOEL else 'black'
-        cv.fill_style = color
-        cv.fill_rect(c*env.cw, r*env.ch, env.cw, env.ch)
+    cv = env.player_layer
+
+    cv.clear()
+
     # Draw new player
-        # Draw arrow in current cell
-    r,c = env.s
+    r, c = env.s
     cx = c*env.cw + env.cw/2
     cy = r*env.ch + env.ch/2
-    size = min(env.cw, env.ch) * 0.5  # arrow size
+    size = min(env.cw, env.ch) * 0.5  # triangle size
 
     # Determine triangle points based on heading
-    if env.heading==0:   # right
+    if env.heading == 0:       # right
         points = [(cx-size/2, cy-size/2), (cx-size/2, cy+size/2), (cx+size/2, cy)]
-    elif env.heading==90:  # up
+    elif env.heading == 90:    # up
         points = [(cx-size/2, cy+size/2), (cx+size/2, cy+size/2), (cx, cy-size/2)]
-    elif env.heading==180:  # left
+    elif env.heading == 180:   # left
         points = [(cx+size/2, cy-size/2), (cx+size/2, cy+size/2), (cx-size/2, cy)]
-    elif env.heading==270:  # down
+    elif env.heading == 270:   # down
         points = [(cx-size/2, cy-size/2), (cx+size/2, cy-size/2), (cx, cy+size/2)]
 
     # Draw triangle
-    cv.fill_style = 'blue'
+    cv.fill_style = "blue"
     cv.begin_path()
     cv.move_to(*points[0])
     cv.line_to(*points[1])
@@ -119,24 +128,25 @@ def draw_player_smooth(old_pos=None):
 # --------------------------------
 def move_to(p, delay=True):
     global env
-    r,c = p
-    if env.doolhof[r][c]==MUUR:
-        print("AUCH! My nose hurts ; I hit the wall!")
-        print("I refuse to continue! The program stops here!")
+    r, c = p
+    if env.doolhof[r][c] == MUUR:
+        print("AUCH! Hit the wall!")
         return
+
     old_pos = env.s
-    env.s = (r,c)
+    env.s = (r, c)
     if graphics:
         draw_player_smooth(old_pos)
     if text:
         printCurrent()
-    if delay: time.sleep(step_delay)
+    if delay:
+        import time
+        time.sleep(step_delay)
 
 def move_up(delay=True): move_to((env.s[0]-1, env.s[1]), delay)
 def move_down(delay=True): move_to((env.s[0]+1, env.s[1]), delay)
 def move_left(delay=True): move_to((env.s[0], env.s[1]-1), delay)
 def move_right(delay=True): move_to((env.s[0], env.s[1]+1), delay)
-def reset(delay=True): move_to(env.start, delay)
 
 # --------------------------------
 # Heading & turning
@@ -233,7 +243,7 @@ def printCurrent():
 # --------------------------------
 def laad_doolhof(path="doolhof.txt"):
     global env
-    
+
     env.doolhof, env.s, env.e = lees_doolhof(path)
     env.start = env.s
     env.dh = len(env.doolhof)
@@ -244,10 +254,15 @@ def laad_doolhof(path="doolhof.txt"):
     env.ch = env.h / env.dh
     env.heading = 0
 
-    env.cv = Canvas(width=env.w, height=env.h)
+    # Create MultiCanvas: 0 = maze, 1 = player
+    env.cv = MultiCanvas(2, width=env.w, height=env.h)
+    env.maze_layer = env.cv[0]
+    env.player_layer = env.cv[1]
+
     display(env.cv)
-    draw_doolhof_once()
-    draw_player_smooth()
+
+    draw_doolhof_once()   # draw maze once
+    draw_player_smooth()  # draw player on top
 
 # --------------------------------
 # Keep original API aliases
